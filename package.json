@@ -1,0 +1,1 @@
+{"description":"Cobro CoDi en 3 toques para vendedores de tianguis y negocios de barrio. Hackatón México 2026.","engines":{"node":">=18"},"license":"MIT","main":"server.js","name":"cobraya","scripts":{"start":"node server.js"},"version":"0.1.0"}
