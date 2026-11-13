@@ -1,0 +1,134 @@
+/* CobraYa — estilos simples, pensados para el celular del vendedor. */
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: #f4f4f4;
+  color: #222;
+}
+main { max-width: 480px; margin: 0 auto; padding: 16px; }
+header { text-align: center; }
+h1 { margin: 8px 0 0; font-size: 2rem; }
+.sub { margin: 4px 0 16px; color: #555; }
+h2 { text-align: center; }
+.oculta { display: none; }
+
+.monto-display {
+  font-size: 3rem;
+  font-weight: 700;
+  text-align: center;
+  background: #fff;
+  border: 2px solid #ddd;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.rapidos {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.rapido { display: flex; flex-direction: column; gap: 4px; }
+.btn-rapido {
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding: 12px 0;
+  border: 2px solid #1a7f37;
+  border-radius: 10px;
+  background: #e6f4ea;
+  color: #1a7f37;
+  cursor: pointer;
+}
+.btn-editar {
+  font-size: 0.85rem;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: #555;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.input-editar {
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding: 10px 0;
+  text-align: center;
+  border: 2px solid #1a7f37;
+  border-radius: 10px;
+  width: 100%;
+}
+
+.teclado {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.teclado button {
+  font-size: 1.5rem;
+  padding: 14px 0;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+}
+.teclado button.borrar { font-size: 1.25rem; }
+
+.concepto-label { display: block; margin: 4px 0; font-weight: 600; }
+#concepto {
+  width: 100%;
+  font-size: 1rem;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+
+.btn-principal, .btn-secundario {
+  display: block;
+  width: 100%;
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+.btn-principal { background: #1a7f37; color: #fff; }
+.btn-secundario { background: #e0e0e0; color: #222; }
+
+.monto-qr { font-size: 2rem; font-weight: 700; text-align: center; margin: 8px 0; }
+.concepto-qr { text-align: center; color: #555; }
+#qr-canvas {
+  display: block;
+  margin: 12px auto;
+  border: 8px solid #fff;
+  outline: 1px solid #ccc;
+}
+.aviso-demo {
+  background: #fff3cd;
+  border: 1px solid #e6c200;
+  border-radius: 8px;
+  padding: 10px;
+  font-weight: 600;
+}
+.esperando { text-align: center; color: #555; }
+
+.pantalla-verde { background: #1a7f37; color: #fff; border-radius: 16px; padding: 24px 16px; }
+.pantalla-verde h2 { font-size: 2rem; }
+.monto-recibido { font-size: 2.25rem; font-weight: 700; text-align: center; }
+.pantalla-verde .btn-secundario { background: rgba(255,255,255,.25); color: #fff; }
+
+.total-hoy { font-weight: 700; text-align: center; }
+.lista-ventas { list-style: none; padding: 0; }
+.lista-ventas li {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+.lista-ventas li.vacia { color: #777; text-align: center; }

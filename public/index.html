@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CobraYa — Cobro CoDi en 3 toques</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>CobraYa</h1>
+      <p class="sub">Cobro CoDi en 3 toques · para tianguis y negocios de barrio</p>
+    </header>
+
+    <!-- Pantalla 1: Cobrar (abre directo en el teclado de monto) -->
+    <section id="pantalla-cobrar" class="pantalla">
+      <div class="monto-display" id="monto-display">$0</div>
+
+      <div class="rapidos" id="rapidos"><!-- botones rápidos + Editar --></div>
+
+      <div class="teclado" id="teclado">
+        <button data-tecla="1">1</button><button data-tecla="2">2</button><button data-tecla="3">3</button>
+        <button data-tecla="4">4</button><button data-tecla="5">5</button><button data-tecla="6">6</button>
+        <button data-tecla="7">7</button><button data-tecla="8">8</button><button data-tecla="9">9</button>
+        <button data-tecla=".">.</button><button data-tecla="0">0</button>
+        <button data-tecla="borrar" class="borrar">⌫</button>
+      </div>
+
+      <label class="concepto-label" for="concepto">Concepto (opcional)</label>
+      <input id="concepto" type="text" placeholder="Ej. 2 kg de jitomate" maxlength="80">
+
+      <button id="btn-generar-qr" class="btn-principal">Generar QR</button>
+
+      <button id="btn-ver-ventas" class="btn-secundario">Ventas de hoy</button>
+    </section>
+
+    <!-- Pantalla 2: QR de la venta -->
+    <section id="pantalla-qr" class="pantalla oculta">
+      <h2>QR de la venta</h2>
+      <p class="monto-qr" id="qr-monto"></p>
+      <p class="concepto-qr" id="qr-concepto"></p>
+      <canvas id="qr-canvas" width="252" height="252"></canvas>
+      <p class="aviso-demo">⚠️ QR DE DEMOSTRACIÓN — no cobra nada. La integración real con la API de Pey está pendiente de las credenciales.</p>
+      <p class="esperando">Esperando pago…</p>
+      <!-- SOLO DEMO: con Pey real este botón se quita y la confirmación llega por webhook. -->
+      <button id="btn-simular-pago" class="btn-principal">Simular pago recibido</button>
+      <button id="btn-cancelar-venta" class="btn-secundario">Cancelar venta</button>
+    </section>
+
+    <!-- Pantalla 3: ¡Pago recibido! -->
+    <section id="pantalla-recibido" class="pantalla oculta pantalla-verde">
+      <h2>¡Pago recibido!</h2>
+      <p class="monto-recibido" id="recibido-monto"></p>
+      <p id="recibido-concepto"></p>
+      <p>La venta quedó guardada en la lista de hoy.</p>
+      <button id="btn-nueva-venta" class="btn-principal">Nueva venta</button>
+      <button id="btn-ventas-desde-recibido" class="btn-secundario">Ver ventas de hoy</button>
+    </section>
+
+    <!-- Pantalla 4: Pago no confirmado -->
+    <section id="pantalla-no-confirmado" class="pantalla oculta">
+      <h2>Pago no confirmado</h2>
+      <p>Esta venta no se confirmó. Puedes intentarlo de nuevo o hacer una venta nueva.</p>
+      <button id="btn-reintentar" class="btn-principal">Nueva venta</button>
+      <button id="btn-ventas-desde-noconfirmado" class="btn-secundario">Ver ventas de hoy</button>
+    </section>
+
+    <!-- Pantalla 5: Ventas de hoy -->
+    <section id="pantalla-ventas" class="pantalla oculta">
+      <h2>Ventas de hoy</h2>
+      <p class="total-hoy" id="total-hoy"></p>
+      <ul id="lista-ventas" class="lista-ventas"></ul>
+      <button id="btn-volver-cobrar" class="btn-principal">Volver a cobrar</button>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
