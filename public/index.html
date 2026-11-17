@@ -41,7 +41,9 @@
       <p class="monto-qr" id="qr-monto"></p>
       <p class="concepto-qr" id="qr-concepto"></p>
       <canvas id="qr-canvas" width="252" height="252"></canvas>
-      <p class="aviso-demo">⚠️ QR DE DEMOSTRACIÓN — no cobra nada. La integración real con la API de Pey está pendiente de las credenciales.</p>
+      <img id="qr-real" class="oculta" alt="QR real de Pey" width="252" height="252">
+      <p id="qr-texto" class="qr-texto"></p>
+      <p class="aviso-demo" id="aviso-demo">⚠️ QR DE DEMOSTRACIÓN — no cobra nada. La integración real con la API de Pey está pendiente de las credenciales.</p>
       <p class="esperando">Esperando pago…</p>
       <!-- SOLO DEMO: con Pey real este botón se quita y la confirmación llega por webhook. -->
       <button id="btn-simular-pago" class="btn-principal">Simular pago recibido</button>

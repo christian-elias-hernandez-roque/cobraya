@@ -108,6 +108,19 @@ h2 { text-align: center; }
   border: 8px solid #fff;
   outline: 1px solid #ccc;
 }
+#qr-real {
+  display: block;
+  margin: 12px auto;
+  border: 8px solid #fff;
+  outline: 1px solid #ccc;
+}
+.qr-texto {
+  word-break: break-all;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #555;
+  margin: 12px 0;
+}
 .aviso-demo {
   background: #fff3cd;
   border: 1px solid #e6c200;

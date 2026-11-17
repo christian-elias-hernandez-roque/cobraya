@@ -8,6 +8,14 @@ const RAPIDOS_DEFAULT = [20, 50, 100, 100];
 
 let montoTexto = '';
 let ventaActual = null;
+let sondeoActual = null;
+
+function pararSondeo() {
+  if (sondeoActual) {
+    clearInterval(sondeoActual);
+    sondeoActual = null;
+  }
+}
 
 const $ = (id) => document.getElementById(id);
 
@@ -137,6 +145,35 @@ function dibujarQrDemo(semilla) {
   esquina(0, modulos - 7);
 }
 
+// --- QR real de Pey: imagen si es data:image/..., texto si es cadena CoDi ---
+// El formato exacto se decide con la respuesta 201 real (ver respuestaPey).
+function mostrarQrReal(qr) {
+  const canvas = $('qr-canvas');
+  const img = $('qr-real');
+  const texto = $('qr-texto');
+  if (typeof qr === 'string' && qr.startsWith('data:image')) {
+    img.src = qr;
+    img.classList.remove('oculta');
+    canvas.classList.add('oculta');
+    texto.textContent = '';
+  } else if (typeof qr === 'string' && qr.length > 0) {
+    canvas.classList.add('oculta');
+    img.classList.add('oculta');
+    texto.textContent = qr;
+  } else {
+    // Pey no devolvió QR visible: se deja el QR demo como respaldo visual
+    // y el cobro sigue siendo real (codiQrId quedó guardado en el servidor).
+    dibujarQrDemo(ventaActual ? ventaActual.numRef : 'cobraya');
+  }
+}
+
+function mostrarQrDemo(semilla) {
+  $('qr-canvas').classList.remove('oculta');
+  $('qr-real').classList.add('oculta');
+  $('qr-texto').textContent = '';
+  dibujarQrDemo(semilla);
+}
+
 // --- Flujo de venta ---
 $('btn-generar-qr').addEventListener('click', async () => {
   const monto = parseFloat(montoTexto);
@@ -154,12 +191,38 @@ $('btn-generar-qr').addEventListener('click', async () => {
     alert('No se pudo crear la venta. Inténtalo de nuevo.');
     return;
   }
-  const { venta } = await res.json();
+  const { venta, modo } = await res.json();
   ventaActual = venta;
   $('qr-monto').textContent = `$${venta.monto} MXN`;
   $('qr-concepto').textContent = venta.concepto ? `Concepto: ${venta.concepto}` : 'Sin concepto';
-  dibujarQrDemo(venta.numRef);
+  // Si Pey devolvió un QR real, mostrarlo; si no, seguir con el QR demo.
+  if (modo === 'real' && venta.qrReal) {
+    mostrarQrReal(venta.qrReal);
+    $('btn-simular-pago').style.display = 'none'; // con Pey real no se simula
+    $('aviso-demo').style.display = 'none';
+  } else {
+    mostrarQrDemo(venta.numRef);
+    $('btn-simular-pago').style.display = '';
+    $('aviso-demo').style.display = '';
+  }
   mostrarPantalla('pantalla-qr');
+  // Sondeo: cada 3 s preguntar si esta venta ya se pagó (webhook).
+  pararSondeo();
+  sondeoActual = setInterval(async () => {
+    try {
+      const r = await fetch('/api/ventas');
+      const { ventas } = await r.json();
+      const actual = ventas.find((v) => v.id === ventaActual?.id);
+      if (!actual) return;
+      if (actual.estado === 'pagado') {
+        pararSondeo();
+        $('recibido-monto').textContent = `$${actual.monto} MXN`;
+        $('recibido-concepto').textContent = actual.concepto ? `Concepto: ${actual.concepto}` : '';
+        ventaActual = null;
+        mostrarPantalla('pantalla-recibido');
+      }
+    } catch { /* reintentar en el siguiente sondeo */ }
+  }, 3000);
 });
 
 // SOLO DEMO: con Pey real este botón no existe; la pantalla verde llega sola
@@ -172,6 +235,7 @@ $('btn-simular-pago').addEventListener('click', async () => {
     return;
   }
   const { venta } = await res.json();
+  pararSondeo();
   $('recibido-monto').textContent = `$${venta.monto} MXN`;
   $('recibido-concepto').textContent = venta.concepto ? `Concepto: ${venta.concepto}` : '';
   ventaActual = null;
@@ -179,6 +243,7 @@ $('btn-simular-pago').addEventListener('click', async () => {
 });
 
 $('btn-cancelar-venta').addEventListener('click', async () => {
+  pararSondeo();
   if (ventaActual) {
     await fetch(`/api/ventas/${ventaActual.id}/no-confirmado`, { method: 'POST' });
     ventaActual = null;
@@ -187,6 +252,7 @@ $('btn-cancelar-venta').addEventListener('click', async () => {
 });
 
 function nuevaVenta() {
+  pararSondeo();
   montoTexto = '';
   $('concepto').value = '';
   mostrarMonto();
