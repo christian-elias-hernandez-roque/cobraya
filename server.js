@@ -31,6 +31,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const crypto = require('node:crypto');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -61,9 +62,12 @@ function nuevaVenta(monto, concepto) {
   const ventas = cargarVentas();
   const venta = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-    // numRef: referencia única de la venta. Se manda a Pey al crear el cobro
-    // y Pey la devuelve en el webhook, así se sabe qué venta se pagó.
-    numRef: 'CB-' + Date.now().toString(36).toUpperCase(),
+    // numRef: referencia única de la venta. Pey exige que sea numérica
+    // de máximo 7 dígitos ("Numeric reference must be up to 7 digits",
+    // error 400 verificado en la prueba real del 17 nov 2026), así que
+    // se genera un número aleatorio de 7 dígitos. Se manda a Pey al crear
+    // el cobro y Pey la devuelve en el webhook, así se sabe qué venta se pagó.
+    numRef: String(Math.floor(1000000 + Math.random() * 9000000)),
     monto: Number(monto),
     concepto: (concepto || '').trim(),
     estado: 'pendiente', // pendiente | pagado | no-confirmado
@@ -98,11 +102,57 @@ function nuevaVenta(monto, concepto) {
 //    // 201 → el QR real. Guardar en la venta lo que devuelva (id/imagen).
 //  Mientras no haya credenciales, se usa el QR de demostración que dibuja
 //  el cliente (public/app.js) y el botón "Simular pago recibido".
-async function crearCobroReal(_venta) {
-  throw new Error(
-    'Integración Pey pendiente: faltan las credenciales (API key). ' +
-    'Ver README.md, sección "Estado actual".'
-  );
+const PEY_API_URL = 'https://api.pey.mx/codi/qr';
+
+async function crearCobroReal(venta) {
+  const apiKey = process.env.PEY_API_KEY;
+  if (!apiKey) throw new Error('Falta PEY_API_KEY en el entorno del servidor.');
+  const res = await fetch(PEY_API_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      amount: venta.monto,
+      concept: venta.concepto || `Venta ${venta.numRef}`,
+      expiration: 600, // 10 minutos
+      numRef: venta.numRef,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(`Pey respondió ${res.status}: ${JSON.stringify(data)}`);
+  }
+  // Formato del 201 confirmado en la prueba real del 17 nov 2026:
+  // { id, qrString } — qrString es el payload CoDi (JSON de 496 chars)
+  // que hay que convertir a imagen QR para que la app del banco lo lea.
+  const qr = data.qrString || data.qr || data.qrImage || data.qrText || data.image
+    || (data.data && (data.data.qrString || data.data.qr || data.data.qrImage)) || null;
+  const ventas = cargarVentas();
+  const v = ventas.find((x) => x.id === venta.id);
+  if (v) {
+    v.codiQrId = data.codiQrId || data.id || (data.data && data.data.codiQrId) || null;
+    v.qrReal = qr;              // texto o data:image/... del QR real
+    v.respuestaPey = data;      // cruda, para ver el formato en la 1ª llamada
+    guardarVentas(ventas);
+  }
+  return { qr, codiQrId: v ? v.codiQrId : null };
+}
+
+// Verificación de la firma del webhook de Pey.
+// El algoritmo exacto de `webhook-signature: v1,…` no estaba en las páginas
+// de la documentación leídas: se usa HMAC-SHA256 del cuerpo crudo, el
+// esquema más común para `v1=<hex>`, y se marca para cambiarlo si Pey usa otro.
+function verificarFirmaPey(cuerpoCrudo, firma) {
+  const secreto = process.env.PEY_WEBHOOK_SECRET;
+  if (!secreto) return { verificado: false, motivo: 'sin-secreto-configurado' };
+  if (!firma || !firma.startsWith('v1=')) return { verificado: false, motivo: 'firma-ausente' };
+  const esperado = 'v1=' + crypto.createHmac('sha256', secreto).update(cuerpoCrudo).digest('hex');
+  const a = Buffer.from(firma);
+  const b = Buffer.from(esperado);
+  const ok = a.length === b.length && crypto.timingSafeEqual(a, b);
+  return { verificado: ok, motivo: ok ? null : 'firma-no-coincide' };
 }
 
 function marcarPagada(venta, { codiQrId = null, transactionId = null } = {}) {
@@ -139,6 +189,22 @@ function leerBody(req) {
   });
 }
 
+// Como leerBody, pero devuelve el texto crudo además del objeto, para
+// verificar la firma HMAC del webhook antes de confiar en el payload.
+function leerBodyCrudo(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', (chunk) => (body += chunk));
+    req.on('end', () => {
+      try {
+        resolve({ crudo: body, payload: body ? JSON.parse(body) : {} });
+      } catch (e) {
+        reject(e);
+      }
+    });
+  });
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const ruta = url.pathname;
@@ -161,10 +227,24 @@ const server = http.createServer(async (req, res) => {
       if (!monto || Number(monto) <= 0) {
         return json(400, { error: 'El monto debe ser mayor que 0.' });
       }
-      const venta = nuevaVenta(monto, concepto);
-      // TODO PEY: aquí se llamaría a crearCobroReal(venta) y se guardaría
-      // el QR real en la venta antes de responder al cliente.
-      return json(201, { venta, demo: true });
+      let venta = nuevaVenta(monto, concepto);
+      // Con llave: intento de cobro real en Pey; sin llave, demo como antes.
+      // Si Pey falla, se sigue en demo y el error queda guardado en el servidor.
+      let modo = 'demo';
+      if (process.env.PEY_API_KEY) {
+        try {
+          await crearCobroReal(venta);
+          modo = 'real';
+          // crearCobroReal guarda qrReal/codiQrId en disco: recargar la venta
+          // para devolver al cliente los datos actualizados.
+          const actualizada = cargarVentas().find((x) => x.id === venta.id);
+          if (actualizada) venta = actualizada;
+        } catch (e) {
+          console.error('Pey falló, se sigue en demo:', e.message);
+          venta.errorPey = e.message; // se guarda para depurar, no se muestra al cliente
+        }
+      }
+      return json(201, { venta, demo: modo === 'demo', modo });
     }
 
     // API: simular que llegó el pago (SOLO DEMO — se quita con Pey real)
@@ -198,7 +278,15 @@ const server = http.createServer(async (req, res) => {
     //         2) buscar la venta por numRef, 3) marcarla pagada y guardar
     //         codiQrId + transactionId. NO marcar pagos sin verificar la firma.
     if (ruta === '/api/webhooks/pey' && req.method === 'POST') {
-      const payload = await leerBody(req);
+      const { crudo, payload } = await leerBodyCrudo(req);
+      // En modo real (hay llave) un webhook sin firma válida no marca el pago.
+      // En demo se acepta como antes, pero queda registrado el aviso.
+      const { verificado, motivo } = verificarFirmaPey(crudo, req.headers['webhook-signature']);
+      if (process.env.PEY_API_KEY && !verificado) {
+        console.warn('Webhook Pey rechazado:', motivo);
+        return json(401, { error: 'Firma del webhook no verificada.' });
+      }
+      if (!verificado) console.warn('Webhook sin verificar (modo demo, sin secreto):', motivo);
       if (payload.type !== 'codi.qr.payment_received') {
         return json(200, { ok: true, ignorado: true });
       }
@@ -228,5 +316,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`CobraYa corriendo en http://localhost:${PORT}`);
-  console.log('Modo: demostración (QR demo). Integración Pey: pendiente de credenciales.');
+  console.log(process.env.PEY_API_KEY
+    ? 'Modo: real (Pey). Integración Pey: activa.'
+    : 'Modo: demostración (QR demo). Integración Pey: pendiente de credenciales.');
 });
