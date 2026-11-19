@@ -141,17 +141,34 @@ async function crearCobroReal(venta) {
 }
 
 // Verificación de la firma del webhook de Pey.
-// El algoritmo exacto de `webhook-signature: v1,…` no estaba en las páginas
-// de la documentación leídas: se usa HMAC-SHA256 del cuerpo crudo, el
-// esquema más común para `v1=<hex>`, y se marca para cambiarlo si Pey usa otro.
-function verificarFirmaPey(cuerpoCrudo, firma) {
+// Pey usa el formato Standard Webhooks (confirmado en los logs de Railway,
+// 18 nov 21:00:28): headers webhook-id, webhook-timestamp y
+// webhook-signature: "v1,<base64>". La firma es HMAC-SHA256 del mensaje
+// "<webhook-id>.<webhook-timestamp>.<cuerpo crudo>", en base64.
+// Antes el código exigía que la firma empezara con "v1=" (con igual) y Pey
+// manda "v1," (con coma), así que todas las firmas se descartaban como
+// "firma-ausente". Se aceptan además los formatos alternativos (HMAC del
+// cuerpo crudo, en base64 o hex) por si Pey cambia de esquema; todos exigen
+// el secreto, así que la verificación sigue siendo real.
+function verificarFirmaPey(cuerpoCrudo, firma, headers) {
   const secreto = process.env.PEY_WEBHOOK_SECRET;
   if (!secreto) return { verificado: false, motivo: 'sin-secreto-configurado' };
-  if (!firma || !firma.startsWith('v1=')) return { verificado: false, motivo: 'firma-ausente' };
-  const esperado = 'v1=' + crypto.createHmac('sha256', secreto).update(cuerpoCrudo).digest('hex');
-  const a = Buffer.from(firma);
-  const b = Buffer.from(esperado);
-  const ok = a.length === b.length && crypto.timingSafeEqual(a, b);
+  if (!firma) return { verificado: false, motivo: 'firma-ausente' };
+  // Standard Webhooks: puede haber varias firmas separadas por espacios.
+  const firmas = firma.split(' ').map((s) => s.trim()).filter((s) => s.startsWith('v1,')).map((s) => s.slice(3));
+  if (!firmas.length) return { verificado: false, motivo: 'firma-formato-desconocido' };
+  const id = (headers && headers['webhook-id']) || '';
+  const ts = (headers && headers['webhook-timestamp']) || '';
+  const candidatos = [
+    crypto.createHmac('sha256', secreto).update(`${id}.${ts}.${cuerpoCrudo}`).digest('base64'),
+    crypto.createHmac('sha256', secreto).update(cuerpoCrudo).digest('base64'),
+    crypto.createHmac('sha256', secreto).update(cuerpoCrudo).digest('hex'),
+  ];
+  const ok = firmas.some((f) => candidatos.some((esperado) => {
+    const a = Buffer.from(f);
+    const b = Buffer.from(esperado);
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  }));
   return { verificado: ok, motivo: ok ? null : 'firma-no-coincide' };
 }
 
@@ -287,7 +304,7 @@ const server = http.createServer(async (req, res) => {
       console.log('Webhook Pey payload:', JSON.stringify({ type: payload.type, numRef: payload.numRef, codiQrId: payload.codiQrId, amount: payload.amount }));
       // En modo real (hay llave) un webhook sin firma válida no marca el pago.
       // En demo se acepta como antes, pero queda registrado el aviso.
-      const { verificado, motivo } = verificarFirmaPey(crudo, req.headers['webhook-signature']);
+      const { verificado, motivo } = verificarFirmaPey(crudo, req.headers['webhook-signature'], req.headers);
       if (process.env.PEY_API_KEY && !verificado) {
         console.warn('Webhook Pey rechazado:', motivo);
         return json(401, { error: 'Firma del webhook no verificada.' });
