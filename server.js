@@ -159,11 +159,24 @@ function verificarFirmaPey(cuerpoCrudo, firma, headers) {
   if (!firmas.length) return { verificado: false, motivo: 'firma-formato-desconocido' };
   const id = (headers && headers['webhook-id']) || '';
   const ts = (headers && headers['webhook-timestamp']) || '';
-  const candidatos = [
-    crypto.createHmac('sha256', secreto).update(`${id}.${ts}.${cuerpoCrudo}`).digest('base64'),
-    crypto.createHmac('sha256', secreto).update(cuerpoCrudo).digest('base64'),
-    crypto.createHmac('sha256', secreto).update(cuerpoCrudo).digest('hex'),
+  // Standard Webhooks: el secreto se guarda como "whsec_<base64>" y la clave
+  // real para el HMAC son los bytes decodificados, no el texto literal.
+  // Se prueban ambas claves (decodificada y literal) y varios mensajes.
+  const claves = [secreto];
+  if (secreto.startsWith('whsec_')) {
+    try { claves.unshift(Buffer.from(secreto.slice(6), 'base64')); } catch (e) { /* secreto sin base64 válido: se usa literal */ }
+  }
+  const mensajes = [
+    `${id}.${ts}.${cuerpoCrudo}`,
+    cuerpoCrudo,
   ];
+  const candidatos = [];
+  for (const clave of claves) {
+    for (const mensaje of mensajes) {
+      candidatos.push(crypto.createHmac('sha256', clave).update(mensaje).digest('base64'));
+      candidatos.push(crypto.createHmac('sha256', clave).update(mensaje).digest('hex'));
+    }
+  }
   const ok = firmas.some((f) => candidatos.some((esperado) => {
     const a = Buffer.from(f);
     const b = Buffer.from(esperado);
