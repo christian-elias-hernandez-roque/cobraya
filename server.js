@@ -279,6 +279,12 @@ const server = http.createServer(async (req, res) => {
     //         codiQrId + transactionId. NO marcar pagos sin verificar la firma.
     if (ruta === '/api/webhooks/pey' && req.method === 'POST') {
       const { crudo, payload } = await leerBodyCrudo(req);
+      // Diagnóstico (18 nov): el webhook real de Pey llegó sin el header
+      // webhook-signature, así que se rechazó con 401 ("firma-ausente").
+      // Registrar los headers que Pey realmente manda para ajustar la
+      // verificación al formato real en vez de suponerlo.
+      console.log('Webhook Pey headers:', JSON.stringify(req.headers));
+      console.log('Webhook Pey payload:', JSON.stringify({ type: payload.type, numRef: payload.numRef, codiQrId: payload.codiQrId, amount: payload.amount }));
       // En modo real (hay llave) un webhook sin firma válida no marca el pago.
       // En demo se acepta como antes, pero queda registrado el aviso.
       const { verificado, motivo } = verificarFirmaPey(crudo, req.headers['webhook-signature']);
