@@ -114,6 +114,19 @@ h2 { text-align: center; }
   border: 8px solid #fff;
   outline: 1px solid #ccc;
 }
+#qr-real-contenedor {
+  width: 252px;
+  margin: 12px auto;
+  border: 8px solid #fff;
+  outline: 1px solid #ccc;
+  background: #fff;
+}
+#qr-real-contenedor img,
+#qr-real-contenedor canvas {
+  display: block;
+  width: 252px;
+  height: 252px;
+}
 .qr-texto {
   word-break: break-all;
   text-align: center;

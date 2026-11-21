@@ -42,6 +42,7 @@
       <p class="concepto-qr" id="qr-concepto"></p>
       <canvas id="qr-canvas" width="252" height="252"></canvas>
       <img id="qr-real" class="oculta" alt="QR real de Pey" width="252" height="252">
+      <div id="qr-real-contenedor" class="oculta"></div>
       <p id="qr-texto" class="qr-texto"></p>
       <p class="aviso-demo" id="aviso-demo">⚠️ QR DE DEMOSTRACIÓN — no cobra nada. La integración real con la API de Pey está pendiente de las credenciales.</p>
       <p class="esperando">Esperando pago…</p>
@@ -76,6 +77,7 @@
       <button id="btn-volver-cobrar" class="btn-principal">Volver a cobrar</button>
     </section>
   </main>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

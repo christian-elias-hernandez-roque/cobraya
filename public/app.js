@@ -1,7 +1,7 @@
 // CobraYa — cliente (corre en el navegador del celular del vendedor).
 // No lleva credenciales: la API key de Pey solo la usa el servidor (server.js).
-// El QR de aquí es de DEMOSTRACIÓN. La integración real va en el servidor:
-//   POST https://api.pey.mx/codi/qr  +  webhook de confirmación.
+// Con llave real, el QR que se muestra es el de Pey (POST /codi/qr) y la
+// confirmación llega por webhook; sin llave, modo demostración.
 
 const LS_RAPIDOS = 'cobraya-montos-rapidos';
 const RAPIDOS_DEFAULT = [20, 50, 100, 100];
@@ -145,24 +145,48 @@ function dibujarQrDemo(semilla) {
   esquina(0, modulos - 7);
 }
 
-// --- QR real de Pey: imagen si es data:image/..., texto si es cadena CoDi ---
-// El formato exacto se decide con la respuesta 201 real (ver respuestaPey).
+// --- QR real de Pey: imagen si es data:image/...; si es la cadena CoDi
+// (qrString), se dibuja como QR escaneable con la librería qrcodejs.
+// Si la librería no cargó (sin internet al CDN), se muestra el texto
+// como respaldo, como antes.
 function mostrarQrReal(qr) {
   const canvas = $('qr-canvas');
   const img = $('qr-real');
+  const contenedor = $('qr-real-contenedor');
   const texto = $('qr-texto');
-  if (typeof qr === 'string' && qr.startsWith('data:image')) {
-    img.src = qr;
-    img.classList.remove('oculta');
-    canvas.classList.add('oculta');
-    texto.textContent = '';
-  } else if (typeof qr === 'string' && qr.length > 0) {
+  const ocultarTodo = () => {
     canvas.classList.add('oculta');
     img.classList.add('oculta');
-    texto.textContent = qr;
+    contenedor.classList.add('oculta');
+    texto.textContent = '';
+  };
+  if (typeof qr === 'string' && qr.startsWith('data:image')) {
+    ocultarTodo();
+    img.src = qr;
+    img.classList.remove('oculta');
+  } else if (typeof qr === 'string' && qr.length > 0) {
+    ocultarTodo();
+    if (typeof QRCode !== 'undefined') {
+      contenedor.innerHTML = '';
+      try {
+        new QRCode(contenedor, {
+          text: qr,
+          width: 252,
+          height: 252,
+          correctLevel: QRCode.CorrectLevel.M,
+        });
+        contenedor.classList.remove('oculta');
+      } catch {
+        texto.textContent = qr;
+      }
+    } else {
+      texto.textContent = qr;
+    }
   } else {
     // Pey no devolvió QR visible: se deja el QR demo como respaldo visual
     // y el cobro sigue siendo real (codiQrId quedó guardado en el servidor).
+    ocultarTodo();
+    canvas.classList.remove('oculta');
     dibujarQrDemo(ventaActual ? ventaActual.numRef : 'cobraya');
   }
 }
@@ -170,6 +194,7 @@ function mostrarQrReal(qr) {
 function mostrarQrDemo(semilla) {
   $('qr-canvas').classList.remove('oculta');
   $('qr-real').classList.add('oculta');
+  $('qr-real-contenedor').classList.add('oculta');
   $('qr-texto').textContent = '';
   dibujarQrDemo(semilla);
 }
