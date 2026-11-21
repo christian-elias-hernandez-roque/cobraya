@@ -11,7 +11,7 @@ header { text-align: center; }
 h1 { margin: 8px 0 0; font-size: 2rem; }
 .sub { margin: 4px 0 16px; color: #555; }
 h2 { text-align: center; }
-.oculta { display: none; }
+.oculta { display: none !important; }
 
 .monto-display {
   font-size: 3rem;
